@@ -1,64 +1,64 @@
 import json
 import os
-from typing import Any, Dict
 from uuid import uuid4
+from typing import Any
 from pathlib import Path
 
-def flatten_payload_to_data(payload: Dict[str, Any]) -> Any:
+def load_json_file(filepath: str) -> Any:
+    """Loads a JSON file from disk."""
+    with open(filepath, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def flatten_payload(payload: Any) -> Any:
     """
-    Extracts the core 'data' from a complex payload structure.
-    Assumes the JSON you want is inside a top-level key named 'data'.
+    Attempts to extract meaningful 'data' from a payload.
 
-    Args:
-        payload: A complex or nested dictionary payload.
-
-    Returns:
-        The cleaned/extracted data (list or dict).
+    - If 'data' exists at top level, it returns that.
+    - Else, it returns the first list/dict-like value it can find.
     """
-    if "data" in payload:
-        return payload["data"]
-    
-    # Fallback: try to guess where the main data is
-    for key, value in payload.items():
-        if isinstance(value, (list, dict)):
-            return value
+    if isinstance(payload, dict):
+        if "data" in payload:
+            return payload["data"]
 
-    raise ValueError("No JSON-compatible data structure found in payload.")
+        # Fallback: return first list or dict value
+        for key, val in payload.items():
+            if isinstance(val, (list, dict)):
+                return val
 
-def save_json(data: Any, output_dir: str = ".", prefix: str = "converted") -> str:
-    """
-    Saves a Python dict/list as a JSON file.
+    raise ValueError("No usable data found in the uploaded file.")
 
-    Args:
-        data: The Python data (list, dict, etc.)
-        output_dir: Folder to save the file in.
-        prefix: Prefix for the filename.
-
-    Returns:
-        Path to the saved JSON file.
-    """
+def save_json(data: Any, output_dir: str = ".", prefix: str = "cleaned") -> str:
+    """Saves the data to a new JSON file."""
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     filename = f"{prefix}_{uuid4().hex[:8]}.json"
-    path = os.path.join(output_dir, filename)
+    filepath = os.path.join(output_dir, filename)
 
-    with open(path, "w", encoding="utf-8") as f:
+    with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
-    return path
+    return filepath
 
-def convert_payload_to_json(payload: Dict[str, Any], output_dir: str = ".") -> str:
+def process_uploaded_file(input_path: str, output_dir: str = "json_outputs") -> str:
     """
-    Extracts and saves core JSON content from a complex payload.
-
-    Args:
-        payload: Incoming dictionary or nested payload.
-        output_dir: Where to save the output JSON file.
-
-    Returns:
-        File path to the saved JSON.
+    Main function:
+    - Loads the uploaded file
+    - Extracts meaningful data
+    - Saves it to a new file
+    - Returns new file path
     """
+    print(f"📥 Processing uploaded file: {input_path}")
+    payload = load_json_file(input_path)
+    data = flatten_payload(payload)
+    output_path = save_json(data, output_dir=output_dir)
+    print(f"✅ Cleaned data saved to: {output_path}")
+    return output_path
+
+# --- Example Usage ---
+if __name__ == "__main__":
+    # Replace this with the path to your uploaded payload JSON file
+    uploaded_file_path = "uploaded_payload.json"  # 🔁 <-- Put your file here
+
     try:
-        data = flatten_payload_to_data(payload)
-        return save_json(data, output_dir)
+        final_path = process_uploaded_file(uploaded_file_path)
     except Exception as e:
-        raise RuntimeError(f"Failed to extract or save JSON: {e}")
+        print(f"❌ Error: {e}")
